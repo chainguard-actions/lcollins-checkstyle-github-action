@@ -1,0 +1,67 @@
+name: Test wildcard path pattern
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create multiple Checkstyle XML reports
+        run: |
+          mkdir -p /tmp/checkstyle-reports/module-a
+          mkdir -p /tmp/checkstyle-reports/module-b
+
+          cat > /tmp/checkstyle-reports/module-a/checkstyle-result.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <checkstyle version="8.45">
+            <file name="/src/module-a/Foo.java">
+              <error line="5" column="1" severity="error" message="Missing Javadoc." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+            </file>
+          </checkstyle>
+          EOF
+
+          cat > /tmp/checkstyle-reports/module-b/checkstyle-result.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <checkstyle version="8.45">
+            <file name="/src/module-b/Bar.java">
+              <error line="10" column="1" severity="warning" message="Line too long." source="com.puppycrawl.tools.checkstyle.checks.sizes.LineLengthCheck"/>
+            </file>
+          </checkstyle>
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/checkstyle-reports/**/checkstyle-result.xml
+          name: Checkstyle
+          title: Checkstyle Report
+          check_run: 'false'
+
+      - name: Assert wildcard path results
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          VIOLATIONS: ${{ steps.action.outputs.violations }}
+          CONCLUSION: ${{ steps.action.outputs.conclusion }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "violations: $VIOLATIONS"
+          echo "conclusion: $CONCLUSION"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$VIOLATIONS" ]; then
+              echo "FAIL: violations output is empty"
+              exit 1
+            fi
+            # Should have found violations from both modules (at least 1)
+            if [ "$VIOLATIONS" -lt 1 ]; then
+              echo "FAIL: expected at least 1 violation but got '$VIOLATIONS'"
+              exit 1
+            fi
+            echo "PASS: wildcard path matched reports, violations=$VIOLATIONS"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

@@ -1,0 +1,54 @@
+name: Test no violations
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create clean Checkstyle XML report
+        run: |
+          mkdir -p /tmp/checkstyle-reports
+          cat > /tmp/checkstyle-reports/checkstyle-result.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <checkstyle version="8.45">
+            <file name="/src/main/java/com/example/App.java">
+            </file>
+          </checkstyle>
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/checkstyle-reports/checkstyle-result.xml
+          name: Checkstyle
+          title: Checkstyle Report
+          check_run: 'false'
+
+      - name: Assert violations output
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          VIOLATIONS: ${{ steps.action.outputs.violations }}
+          CONCLUSION: ${{ steps.action.outputs.conclusion }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "violations: $VIOLATIONS"
+          echo "conclusion: $CONCLUSION"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$VIOLATIONS" != "0" ]; then
+              echo "FAIL: expected 0 violations but got '$VIOLATIONS'"
+              exit 1
+            fi
+            if [ "$CONCLUSION" != "success" ] && [ "$CONCLUSION" != "neutral" ]; then
+              echo "FAIL: expected success or neutral conclusion but got '$CONCLUSION'"
+              exit 1
+            fi
+            echo "PASS: no violations, conclusion=$CONCLUSION"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

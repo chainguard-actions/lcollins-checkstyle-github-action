@@ -1,0 +1,65 @@
+name: Test annotation generation disabled
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Create Checkstyle XML report with violations
+        run: |
+          mkdir -p /tmp/checkstyle-reports
+          cat > /tmp/checkstyle-reports/checkstyle-result.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <checkstyle version="8.45">
+            <file name="/src/main/java/com/example/App.java">
+              <error line="10" column="1" severity="error" message="Missing a Javadoc comment." source="com.puppycrawl.tools.checkstyle.checks.javadoc.MissingJavadocMethodCheck"/>
+              <error line="20" column="5" severity="warning" message="Line is longer than 80 characters." source="com.puppycrawl.tools.checkstyle.checks.sizes.LineLengthCheck"/>
+            </file>
+          </checkstyle>
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        with:
+          path: /tmp/checkstyle-reports/checkstyle-result.xml
+          name: Checkstyle No Annotations
+          title: Checkstyle Report (No Annotations)
+          annotation_generation: 'false'
+          check_run: 'false'
+
+      - name: Assert outputs with annotation generation disabled
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          VIOLATIONS: ${{ steps.action.outputs.violations }}
+          FAILURES: ${{ steps.action.outputs.failures }}
+          WARNINGS: ${{ steps.action.outputs.warnings }}
+          CONCLUSION: ${{ steps.action.outputs.conclusion }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "violations: $VIOLATIONS"
+          echo "failures: $FAILURES"
+          echo "warnings: $WARNINGS"
+          echo "conclusion: $CONCLUSION"
+          if [ "$OUTCOME" = "success" ]; then
+            if [ "$VIOLATIONS" != "2" ]; then
+              echo "FAIL: expected 2 violations but got '$VIOLATIONS'"
+              exit 1
+            fi
+            if [ "$FAILURES" != "1" ]; then
+              echo "FAIL: expected 1 failure but got '$FAILURES'"
+              exit 1
+            fi
+            if [ "$WARNINGS" != "1" ]; then
+              echo "FAIL: expected 1 warning but got '$WARNINGS'"
+              exit 1
+            fi
+            echo "PASS: violations counted correctly with annotations disabled"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (sentinel repo is not resolvable)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

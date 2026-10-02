@@ -1,0 +1,48 @@
+name: 'Publish Checkstyle Code Report'
+description: 'Publish Checkstyle code report (adapted from jwgmeligmeyling/checkstyle-github-action)'
+author: 'Luke Collins'
+inputs:
+  path:
+    description: 'A file, directory or wildcard pattern that describes where to find the reports'
+    required: true
+  name:
+    description: 'Check run name under which the report is created'
+    default: Checkstyle
+  title:
+    description: 'Check run title under which the report is created'
+    default: Checkstyle Source Code Analyzer report
+  token:
+    description: >
+      Personal access token (PAT) used to fetch the repository. The PAT is configured
+      with the local git config, which enables your scripts to run authenticated git
+      commands. The post-job step removes the PAT.
+      We recommend using a service account with the least permissions necessary.
+      Also when generating a new PAT, select the least scopes necessary.
+      [Learn more about creating and using encrypted secrets](https://help.github.com/en/actions/automating-your-workflow-with-github-actions/creating-and-using-encrypted-secrets)
+    default: ${{ github.token }}
+  annotation_generation:
+    description: 'When set to false, individual annotations are not generated. The check run summary with the total violation count is still created.'
+    default: 'true'
+  check_run:
+    description: 'Whether to create a GitHub Check Run with the results. Set to false to disable check run creation.'
+    default: 'true'
+outputs:
+  conclusion:
+    description: "The conclusion of the check run: 'success', 'failure', or 'neutral'"
+  violations:
+    description: 'Total number of violations found'
+  failures:
+    description: 'Number of failure-level violations found'
+  warnings:
+    description: 'Number of warning-level violations found'
+  notices:
+    description: 'Number of notice-level violations found'
+  check_href:
+    description: 'URL to the generated check run'
+runs:
+  pre: chainguard-phonehome.js
+  using: 'node24'
+  main: 'dist/index.js'
+branding:
+  icon: umbrella
+  color: purple
